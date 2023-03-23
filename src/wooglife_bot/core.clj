@@ -16,7 +16,7 @@
         temp (json/parse-string reader true)]
     (get-in temp [:preciseTemperature])))
 
-(defn retrieve-lakes [lakes]
+(defn retrieve-lake-temperatures [lakes]
   (for [lake (get-in lakes [:lakes])]
     (let [temperature (retrieve-lake-temperature lake)]
       {:temperature temperature,
@@ -55,7 +55,7 @@
         response (client/get url {:as :reader})]
     (with-open [reader (:body response)]
       (let [lakes (json/parse-stream reader true)]
-        (retrieve-lakes lakes)))))
+        (retrieve-lake-temperatures lakes)))))
 
 (defn format-lake
   [lake]
@@ -90,8 +90,7 @@
 
         (let [message (get-in msg [:message])]
           (if (is-temperature-command message)
-            [(println (send-temperature bot (get-in (get-in message [:from]) [:id]) (generate-temperature-message)))]
-            [(println "not a temperature command")]))
+            [(println (send-temperature bot (get-in (get-in message [:from]) [:id]) (generate-temperature-message)))]))
 
         ;; Increment the next update-id to process.
         (-> msg
