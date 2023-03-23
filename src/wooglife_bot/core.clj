@@ -9,20 +9,27 @@
   (or (System/getenv "API_URL")
       "https://api.woog.life"))
 
-(defn retrieve-lake-temperature [lake]
-  (let [url (format "%s/lake/%s/temperature" (api-url) (get-in lake [:id]))
+(println (format "use `%s` as api url", api-url))
+
+(defn retrieve-lake-temperature
+  "calls the /temperature endpoint for the given lake and returns a map with :name and :temperature (this is the preciseTemperature key from the api)"
+  [lake]
+  (let [url (format "%s/lake/%s/temperature" api-url (get-in lake [:id]))
         response (client/get url (:as :reader))
         reader (get-in response [:body])
         temp (json/parse-string reader true)]
     (get-in temp [:preciseTemperature])))
 
-(defn retrieve-lake-temperatures [lakes]
+(defn retrieve-lake-temperatures
+  "calls the /temperature endpoint for all given lakes, returns the results as a list"
+  [lakes]
   (for [lake (get-in lakes [:lakes])]
     (let [temperature (retrieve-lake-temperature lake)]
       {:temperature temperature,
        :name (get-in lake [:name])})))
 
 (defn is-temperature-command
+  "simlpy checks whether the message text starts with `/temperature`"
   [msg]
   (let [text (get-in msg [:text])]
     (str/starts-with? text "/temperature")))
@@ -51,19 +58,21 @@
 
 (defn get-lakes
   []
-  (let [url (format "%s/lake" (api-url))
+  (let [url (format "%s/lake" api-url)
         response (client/get url {:as :reader})]
     (with-open [reader (:body response)]
       (let [lakes (json/parse-stream reader true)]
-        (retrieve-lake-temperatures lakes)))))
+        lakes))))
 
 (defn format-lake
+  "{name}: {temperature}"
   [lake]
   (format "%s: %s" (get-in lake [:name]) (get-in lake [:temperature])))
 
 (defn generate-temperature-message
   []
-  (let [temperatures (get-lakes)]
+  (let [lakes (get-lakes)
+        temperatures ((retrieve-lake-temperatures lakes))]
     (str "Aktuelle Wassertemperaturen:\n\n"
          (str/join "\n" (for [lake temperatures]
                           (format-lake lake))))))
@@ -80,16 +89,13 @@
   (println "bot service started.")
 
   (loop []
-    (println "checking for chat updates.")
     (let [updates (poll-updates bot @update-id)
           messages (:result updates)]
 
-      ;; Check all messages, if any, for commands/keywords.
       (doseq [msg messages]
-        ;(some-handle-msg-fn bot msg) ; your fn that decides what to do with each message. 
-
         (let [message (get-in msg [:message])]
           (if (is-temperature-command message)
+            (println "handle temperature command")
             [(println (send-temperature bot (get-in (get-in message [:from]) [:id]) (generate-temperature-message)))]))
 
         ;; Increment the next update-id to process.
@@ -98,12 +104,10 @@
             inc
             set-id!))
 
-      ;; Wait a while before checking for updates again.
       (Thread/sleep (:sleep config)))
     (recur)))
 
 (defn -main
-  "I don't do a whole lot ... yet."
   []
   ;; needs BOT_TOKEN in environment
   (app (tbot/create)))
