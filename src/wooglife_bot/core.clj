@@ -5,8 +5,12 @@
             [cheshire.core :as json])
   (:gen-class))
 
+(defonce api-url
+  (or (System/getenv "API_URL")
+      "https://api.woog.life"))
+
 (defn retrieve-lake-temperature [lake]
-  (let [url (format "https://api.woog.life/lake/%s/temperature", (get-in lake [:id]))
+  (let [url (format "%s/lake/%s/temperature" (api-url) (get-in lake [:id]))
         response (client/get url (:as :reader))
         reader (get-in response [:body])
         temp (json/parse-string reader true)]
@@ -47,7 +51,7 @@
 
 (defn get-lakes
   []
-  (let [url "https://api.woog.life/lake"
+  (let [url (format "%s/lake" (api-url))
         response (client/get url {:as :reader})]
     (with-open [reader (:body response)]
       (let [lakes (json/parse-stream reader true)]
