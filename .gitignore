@@ -18,3 +18,5 @@ pom.xml.asc
 *.iml
 
 .clj-kondo
+
+.lsp/
