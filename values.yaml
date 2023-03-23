@@ -1,0 +1,26 @@
+namespace: wooglife
+
+deployment:
+  name: telegram-bot
+  image: ghcr.io/woog-life/telegram-bot:__TAG__
+  imagePullPolicy: IfNotPresent
+  revisionHistoryLimit: 1
+  replicas: 1
+  labels:
+    app: telegram-bot
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 300m
+    memory: 500Mi
+  updateStrategy: Recreate
+
+secret:
+  # we're reusing the existing token so this is "fine"
+  name: telegram-bot
+
+configmap:
+  name: telegram-bot
+  woog:
+    apiUrl: http://backend
