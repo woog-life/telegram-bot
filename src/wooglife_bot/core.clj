@@ -110,4 +110,4 @@
 (defn -main
   []
   ;; needs BOT_TOKEN in environment
-  (app (tbot/create)))
+  (app (tbot/create (System/getenv "TOKEN"))))
