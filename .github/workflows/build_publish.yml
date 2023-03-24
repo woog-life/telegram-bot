@@ -47,6 +47,6 @@ jobs:
         release_name: telegram-bot
         ref: .
         install: true
-        namespace: woog-life
+        namespace: wooglife
         atomic: true
         kubeconfig: ${{ secrets.KUBECONFIG_RAW }}
