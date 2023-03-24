@@ -72,7 +72,7 @@
 (defn generate-temperature-message
   []
   (let [lakes (get-lakes)
-        temperatures ((retrieve-lake-temperatures lakes))]
+        temperatures (retrieve-lake-temperatures lakes)]
     (str "Aktuelle Wassertemperaturen:\n\n"
          (str/join "\n" (for [lake temperatures]
                           (format-lake lake))))))
