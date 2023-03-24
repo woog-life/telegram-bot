@@ -18,7 +18,7 @@ deployment:
 
 secret:
   # we're reusing the existing token so this is "fine"
-  name: telegram-bot
+  name: telegram-updater-token
 
 configmap:
   name: telegram-bot
