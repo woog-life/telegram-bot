@@ -43,5 +43,10 @@ jobs:
     - name: install helm chart
       uses: OpenAlcoholics/github-action-helm@v0.1.4
       with:
-        exec: helm upgrade telegram-bot . --install --namespace=woog-life --atomic
+        subcommand: upgrade
+        release_name: telegram-bot
+        ref: .
+        install: true
+        namespace: woog-life
+        atomic: true
         kubeconfig: ${{ secrets.KUBECONFIG_RAW }}
