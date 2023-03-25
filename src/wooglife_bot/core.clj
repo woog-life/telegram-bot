@@ -32,7 +32,8 @@
   "simlpy checks whether the message text starts with `/temperature`"
   [msg]
   (let [text (get-in msg [:text])]
-    (str/starts-with? text "/temperature")))
+    (if-not (nil? text)
+      [(str/starts-with? text "/temperature")])))
 
 (def config
   {:sleep 10000}) ;thread/sleep is in milliseconds
