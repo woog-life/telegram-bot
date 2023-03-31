@@ -99,7 +99,7 @@
           #_{:clj-kondo/ignore [:missing-else-branch]}
           (if (is-temperature-command message)
             ((println "handle temperature command")
-             (println (send-temperature bot (get-in (get-in message [:from]) [:id]) (generate-temperature-message))))))
+             (println (send-temperature bot (get-in (get-in message [:chat]) [:id]) (generate-temperature-message))))))
 
         ;; Increment the next update-id to process.
         (-> msg
