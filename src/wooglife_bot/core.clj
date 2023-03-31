@@ -29,7 +29,7 @@
        :name (get-in lake [:name])})))
 
 (defn is-temperature-command
-  "simlpy checks whether the message text starts with `/temperature`"
+  "simply checks whether the message text starts with `/temperature`"
   [msg]
   (let [text (get-in msg [:text])]
     (if-not (nil? text)
@@ -110,5 +110,8 @@
 
 (defn -main
   []
-  ;; needs BOT_TOKEN in environment
-  (app (tbot/create (System/getenv "TOKEN"))))
+  (let [token (System/getenv "TOKEN")]
+    (if (= token nil)
+      [(println "no token defined in environment")
+       (System/exit 1)]
+      [(app (tbot/create token))])))
