@@ -23,7 +23,6 @@
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
   [lakes]
-  (println "retrieve" lakes)
   (for [lake lakes]
     (let [temperature (retrieve-lake-temperature lake)]
       {:temperature temperature,
