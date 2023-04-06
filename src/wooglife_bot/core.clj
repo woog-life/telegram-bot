@@ -14,11 +14,12 @@
 (defn retrieve-lake-temperature
   "calls the /temperature endpoint for the given lake and returns a map with :name and :temperature (this is the preciseTemperature key from the api)"
   [lake]
-  (let [url (format "%s/lake/%s/temperature" api-url (get-in lake [:id]))
-        response (client/get url (:as :reader))
-        reader (get-in response [:body])
-        temp (json/parse-string reader true)]
-    (get-in temp [:preciseTemperature])))
+  (as->
+    (format "%s/lake/%s/temperature" api-url (get-in lake [:id])) $
+    (client/get $ (:as :reader))
+    (get-in $ [:body])
+    (json/parse-string $ true)
+    (get-in $ [:preciseTemperature])))
 
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
@@ -31,10 +32,10 @@
 (defn is-temperature-command
   "simply checks whether the message text starts with `/temperature`"
   [msg]
-  (let [text (get-in msg [:text])]
-    #_{:clj-kondo/ignore [:missing-else-branch]}
-    (if-not (nil? text)
-      [(str/starts-with? text "/temperature")])))
+  (as-> (get-in msg [:text]) $
+        #_{:clj-kondo/ignore [:missing-else-branch]}
+        (if-not (nil? $)
+          [(str/starts-with? $ "/temperature")])))
 
 (def config
   {:sleep 10000})                                           ;thread/sleep is in milliseconds
@@ -60,27 +61,27 @@
 
 (defn lake-name-matches-filter
   [lake-name args]
-  (clojure.core/filter (fn
-                         [arg]
-                         (str/includes? lake-name arg))
-                       (map str/lower-case args)))
+  (->> (map str/lower-case args)
+       (clojure.core/filter (fn
+                              [arg]
+                              (str/includes? lake-name arg))
+                            )))
 
 
 (defn filter-lake
   [lake args]
-  (let
-    [lake-name (str/lower-case (get-in lake [:name]))
-     matches (lake-name-matches-filter lake-name args)]
-    (not (empty? matches))))
-
-(println (filter-lake {:name "Aare (asd)"} ["aare"]))
+  (as-> (get-in lake [:name]) $
+        (str/lower-case $)
+        (lake-name-matches-filter $ args)
+        (not (empty? $))))
 
 (defn filter-lakes
   [lakes args]
-  (clojure.core/filter (fn
-                         [lake]
-                         (filter-lake lake args))
-                       lakes))
+  (->> lakes
+       (clojure.core/filter (fn
+                              [lake]
+                              (filter-lake lake args))
+                            )))
 
 (defn get-lakes
   [args]
@@ -108,16 +109,15 @@
 
 (defn send-temperature
   [bot chat-id message]
-  (let [content {:chat_id chat-id
-                 :text    message}]
-    (tbot/send-message bot content)))
+  ((-> {:chat_id chat-id
+        :text    message}
+       (tbot/send-message bot))))
 
 (defn parse-temperature-command
   [message]
-  (let
-    [text (get-in message [:text])
-     args (rest (str/split text #" "))]
-    args))
+  (as-> (get-in message [:text]) $
+        (rest (str/split $ #" "))
+        ))
 
 (defn handle-temperature-command
   [bot message]
@@ -129,6 +129,7 @@
         (if (= msg "Aktuelle Wassertemperaturen:\n\n")
           (println "don't send temperature due to no content" msg)
           (println (send-temperature bot chat-id msg))))))
+
 
 (defn app
   "Retrieve and process chat messages."
