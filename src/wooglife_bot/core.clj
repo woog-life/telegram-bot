@@ -6,8 +6,8 @@
   (:gen-class))
 
 (defonce api-url
-  (or (System/getenv "API_URL")
-      "https://api.woog.life"))
+         (or (System/getenv "API_URL")
+             "https://api.woog.life"))
 
 (println (format "use `%s` as api url", api-url))
 
@@ -23,10 +23,11 @@
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
   [lakes]
-  (for [lake (get-in lakes [:lakes])]
+  (println "retrieve" lakes)
+  (for [lake lakes]
     (let [temperature (retrieve-lake-temperature lake)]
       {:temperature temperature,
-       :name (get-in lake [:name])})))
+       :name        (get-in lake [:name])})))
 
 (defn is-temperature-command
   "simply checks whether the message text starts with `/temperature`"
@@ -37,7 +38,7 @@
       [(str/starts-with? text "/temperature")])))
 
 (def config
-  {:sleep 10000}) ;thread/sleep is in milliseconds
+  {:sleep 10000})                                           ;thread/sleep is in milliseconds
 
 (defonce update-id (atom nil))
 
@@ -52,19 +53,46 @@
    (poll-updates bot nil))
 
   ([bot offset]
-   (let [resp (tbot/get-updates bot {:offset offset
+   (let [resp (tbot/get-updates bot {:offset  offset
                                      :timeout (:timeout config)})]
      (if (contains? resp :error)
        (println "tbot/get-updates error:" (:error resp))
        resp))))
 
+(defn lake-name-matches-filter
+  [lake-name args]
+  (clojure.core/filter (fn
+                         [arg]
+                         (str/includes? lake-name arg))
+                       (map str/lower-case args)))
+
+
+(defn filter-lake
+  [lake args]
+  (let
+    [lake-name (str/lower-case (get-in lake [:name]))
+     matches (lake-name-matches-filter lake-name args)]
+    (not (empty? matches))))
+
+(println (filter-lake {:name "Aare (asd)"} ["aare"]))
+
+(defn filter-lakes
+  [lakes args]
+  (clojure.core/filter (fn
+                         [lake]
+                         (filter-lake lake args))
+                       lakes))
+
 (defn get-lakes
-  []
+  [args]
   (let [url (format "%s/lake" api-url)
         response (client/get url {:as :reader})]
     (with-open [reader (:body response)]
-      (let [lakes (json/parse-stream reader true)]
-        lakes))))
+      (let [response (json/parse-stream reader true)
+            lakes (get-in response [:lakes])]
+        (if (empty? args)
+          lakes
+          (doall (filter-lakes lakes args)))))))
 
 (defn format-lake
   "{name}: {temperature}"
@@ -72,8 +100,8 @@
   (format "%s: %s" (get-in lake [:name]) (get-in lake [:temperature])))
 
 (defn generate-temperature-message
-  []
-  (let [lakes (get-lakes)
+  [args]
+  (let [lakes (get-lakes args)
         temperatures (retrieve-lake-temperatures lakes)]
     (str "Aktuelle Wassertemperaturen:\n\n"
          (str/join "\n" (for [lake temperatures]
@@ -82,8 +110,26 @@
 (defn send-temperature
   [bot chat-id message]
   (let [content {:chat_id chat-id
-                 :text message}]
+                 :text    message}]
     (tbot/send-message bot content)))
+
+(defn parse-temperature-command
+  [message]
+  (let
+    [text (get-in message [:text])
+     args (rest (str/split text #" "))]
+    args))
+
+(defn handle-temperature-command
+  [bot message]
+  (do (println "handle temperature command")
+      (let
+        [chat-id (get-in (get-in message [:chat]) [:id])
+         args (parse-temperature-command message)
+         msg (generate-temperature-message args)]
+        (if (= msg "Aktuelle Wassertemperaturen:\n\n")
+          (println "don't send temperature due to no content" msg)
+          (println (send-temperature bot chat-id msg))))))
 
 (defn app
   "Retrieve and process chat messages."
@@ -98,8 +144,7 @@
         (let [message (get-in msg [:message])]
           #_{:clj-kondo/ignore [:missing-else-branch]}
           (if (is-temperature-command message)
-            (do (println "handle temperature command")
-                (println (send-temperature bot (get-in (get-in message [:chat]) [:id]) (generate-temperature-message))))))
+            (handle-temperature-command bot message)))
 
         ;; Increment the next update-id to process.
         (-> msg
