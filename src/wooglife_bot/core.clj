@@ -109,9 +109,9 @@
 
 (defn send-temperature
   [bot chat-id message]
-  ((-> {:chat_id chat-id
+  (-> {:chat_id chat-id
         :text    message}
-       (tbot/send-message bot))))
+       (tbot/send-message bot)))
 
 (defn parse-temperature-command
   [message]
