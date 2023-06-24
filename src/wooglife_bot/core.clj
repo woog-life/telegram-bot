@@ -109,9 +109,10 @@
 
 (defn send-temperature
   [bot chat-id message]
-  (-> {:chat_id chat-id
-        :text    message}
-       (tbot/send-message bot)))
+  (println "send to telegram-chat" chat-id)
+     (tbot/send-message bot {:chat_id chat-id
+                             :text    message})
+)
 
 (defn parse-temperature-command
   [message]
