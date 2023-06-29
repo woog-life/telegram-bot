@@ -35,7 +35,7 @@
   (as-> (get-in msg [:text]) $
         #_{:clj-kondo/ignore [:missing-else-branch]}
         (if-not (nil? $)
-          [(str/starts-with? $ "/temperature")])))
+          (str/starts-with? $ "/temperature"))))
 
 (def config
   {:sleep 10000})                                           ;thread/sleep is in milliseconds
