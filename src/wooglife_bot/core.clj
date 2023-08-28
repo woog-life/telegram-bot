@@ -2,12 +2,13 @@
   (:require [telegrambot-lib.core :as tbot]
             [clj-http.client :as client]
             [clojure.string :as str]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [java-time.api :as jt])
   (:gen-class))
 
 (defonce api-url
-         (or (System/getenv "API_URL")
-             "https://api.woog.life"))
+  (or (System/getenv "API_URL")
+      "https://api.woog.life"))
 
 (println (format "use `%s` as api url", api-url))
 
@@ -15,11 +16,16 @@
   "calls the /temperature endpoint for the given lake and returns a map with :name and :temperature (this is the preciseTemperature key from the api)"
   [lake]
   (as->
-    (format "%s/lake/%s/temperature" api-url (get-in lake [:id])) $
+   (format "%s/lake/%s/temperature" api-url (get-in lake [:id])) $
     (client/get $ (:as :reader))
     (get-in $ [:body])
     (json/parse-string $ true)
     (get-in $ [:preciseTemperature])))
+
+(defn parse-time
+  [time]
+  (let [datetime (jt/local-date-time "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" time)]
+    (jt/zoned-date-time (jt/local-date datetime) (jt/local-time datetime) (jt/zone-id "Europe/Berlin"))))
 
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
@@ -29,16 +35,33 @@
       {:temperature temperature,
        :name        (get-in lake [:name])})))
 
+(defn retrieve-lake-tides
+  [lake]
+  (as->
+   (format "%s/lake/%s/tides" api-url (get-in lake [:id])) $
+    (client/get $ (:as :reader))
+    (get-in $ [:body])
+    (json/parse-string $ true)
+    (get-in $ [:extrema])))
+
 (defn is-temperature-command
   "simply checks whether the message text starts with `/temperature`"
   [msg]
   (as-> (get-in msg [:text]) $
-        #_{:clj-kondo/ignore [:missing-else-branch]}
-        (if-not (nil? $)
-          (str/starts-with? $ "/temperature"))))
+    #_{:clj-kondo/ignore [:missing-else-branch]}
+    (if-not (nil? $)
+      (str/starts-with? $ "/temperature"))))
+
+(defn is-tides-command
+  "simply checks whether the message text starts with `/tides"
+  [msg]
+  (as-> (get-in msg [:text]) $
+    #_{:clj-kondo/ignore [:missing-else-branch]}
+    (if-not (nil? $)
+      (str/starts-with? $ "/tides"))))
 
 (def config
-  {:sleep 10000})                                           ;thread/sleep is in milliseconds
+  {:sleep 3000})                                           ;thread/sleep is in milliseconds
 
 (defonce update-id (atom nil))
 
@@ -64,24 +87,22 @@
   (->> (map str/lower-case args)
        (clojure.core/filter (fn
                               [arg]
-                              (str/includes? lake-name arg))
-                            )))
+                              (str/includes? lake-name arg)))))
 
 
 (defn filter-lake
   [lake args]
   (as-> (get-in lake [:name]) $
-        (str/lower-case $)
-        (lake-name-matches-filter $ args)
-        (not (empty? $))))
+    (str/lower-case $)
+    (lake-name-matches-filter $ args)
+    (not (empty? $))))
 
 (defn filter-lakes
   [lakes args]
   (->> lakes
        (clojure.core/filter (fn
                               [lake]
-                              (filter-lake lake args))
-                            )))
+                              (filter-lake lake args)))))
 
 (defn get-lakes
   [args]
@@ -107,30 +128,77 @@
          (str/join "\n" (for [lake temperatures]
                           (format-lake lake))))))
 
-(defn send-temperature
+(defn format-time
+  [time]
+  (jt/format "HH:mm dd.MM" time))
+
+(defn format-high-low-tide
+  [is-high-tide]
+  (if is-high-tide "HW" "NW"))
+
+(defn format-tide-extrema
+  [tide-information]
+  (format "%s %s (%sm)" (format-time (parse-time (get-in tide-information [:time]))) (format-high-low-tide (get-in tide-information [:isHighTide])) (get-in tide-information [:height])))
+
+(defn format-tides
+  [lake-map]
+  (let [lake (get-in lake-map [:lake])
+        tides (get-in lake-map [:tides])]
+    (format "%s\n%s" (get-in lake [:name])
+            (str/join "\n" (for [tide tides]
+                             (format-tide-extrema tide))))))
+
+(defn retrieve-tides
+  [lakes]
+  (for [lake lakes]
+    {:lake lake
+     :tides (retrieve-lake-tides lake)}))
+
+(defn filter-by-supported-feature
+  [lakes feature]
+  (filter (fn [lake]
+            (contains? (set (get-in lake [:features])) feature))
+          lakes))
+
+(defn generate-tides-message
+  [args]
+  (let [lakes (get-lakes args)
+        tides (retrieve-tides (filter-by-supported-feature lakes "tides"))]
+    (str "Aktuelle Tiden-Informationen:\n\n"
+         (str/join "\n\n" (for [tide tides]
+                            (format-tides tide))))))
+
+(defn send-message
   [bot chat-id message]
   (println "send to telegram-chat" chat-id)
-     (tbot/send-message bot {:chat_id chat-id
-                             :text    message})
-)
+  (tbot/send-message bot {:chat_id chat-id
+                          :text    message}))
 
-(defn parse-temperature-command
+(defn parse-command-args
   [message]
   (as-> (get-in message [:text]) $
-        (rest (str/split $ #" "))
-        ))
+    (rest (str/split $ #" "))))
 
 (defn handle-temperature-command
   [bot message]
-  (do (println "handle temperature command")
-      (let
-        [chat-id (get-in (get-in message [:chat]) [:id])
-         args (parse-temperature-command message)
-         msg (generate-temperature-message args)]
-        (if (= msg "Aktuelle Wassertemperaturen:\n\n")
-          (println "don't send temperature due to no content" msg)
-          (println (send-temperature bot chat-id msg))))))
+  (println "handle temperature command")
+  (let
+   [chat-id (get-in (get-in message [:chat]) [:id])
+    args (parse-command-args message)
+    msg (generate-temperature-message args)]
+    (if (= msg "Aktuelle Wassertemperaturen:\n\n")
+      (println "don't send temperature due to no content" msg)
+      (println (send-message bot chat-id msg)))))
 
+(defn handle-tides-command
+  [bot message]
+  (let
+   [chat-id (get-in (get-in message [:chat]) [:id])
+    args (parse-command-args message)
+    msg (generate-tides-message args)]
+    (if (= msg "Aktuelle Tiden-Informationen:\n\n")
+      (println "don't send tides due to no content" msg)
+      (println (send-message bot chat-id msg)))))
 
 (defn app
   "Retrieve and process chat messages."
@@ -145,7 +213,9 @@
         (let [message (get-in msg [:message])]
           #_{:clj-kondo/ignore [:missing-else-branch]}
           (if (is-temperature-command message)
-            (handle-temperature-command bot message)))
+            (handle-temperature-command bot message)
+            (if (is-tides-command message)
+              (handle-tides-command bot message))))
 
         ;; Increment the next update-id to process.
         (-> msg

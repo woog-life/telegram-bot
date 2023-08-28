@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [telegrambot-lib "2.7.0"]
                  [cheshire "5.11.0"]
-                 [clj-http "3.12.3"]]
+                 [clj-http "3.12.3"]
+                 [clojure.java-time "1.3.0"]]
   :main ^:skip-aot wooglife-bot.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
