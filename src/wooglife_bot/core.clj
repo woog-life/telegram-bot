@@ -24,8 +24,8 @@
 
 (defn parse-time
   [time]
-  (let [datetime (jt/local-date-time "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" time)]
-    (jt/zoned-date-time (jt/local-date datetime) (jt/local-time datetime) (jt/zone-id "Europe/Berlin"))))
+  (let [instant (jt/instant time)]
+    (jt/zoned-date-time instant "Europe/Berlin")))
 
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
