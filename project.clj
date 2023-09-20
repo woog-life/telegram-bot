@@ -5,7 +5,7 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [telegrambot-lib "2.7.0"]
-                 [cheshire "5.11.0"]
+                 [cheshire "5.12.0"]
                  [clj-http "3.12.3"]
                  [clojure.java-time "1.3.0"]]
   :main ^:skip-aot wooglife-bot.core
