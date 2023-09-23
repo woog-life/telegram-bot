@@ -16,7 +16,7 @@
   "calls the /temperature endpoint for the given lake and returns a map with :name and :temperature (this is the preciseTemperature key from the api)"
   [lake]
   (as->
-   (format "%s/lake/%s/temperature" api-url (get-in lake [:id])) $
+   (format "%s/lake/%s/temperature?precision=2&formatRegion=DE" api-url (get-in lake [:id])) $
     (client/get $ (:as :reader))
     (get-in $ [:body])
     (json/parse-string $ true)
@@ -118,7 +118,7 @@
 (defn format-lake
   "{name}: {temperature}"
   [lake]
-  (format "%s: %s" (get-in lake [:name]) (get-in lake [:temperature])))
+  (format "%s: %s°C" (get-in lake [:name]) (get-in lake [:temperature])))
 
 (defn generate-temperature-message
   [args]
