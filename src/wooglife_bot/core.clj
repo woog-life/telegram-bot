@@ -23,9 +23,9 @@
     (get-in $ [:preciseTemperature])))
 
 (defn parse-time
-  [time]
+  [time timezone]
   (let [instant (jt/instant time)]
-    (jt/zoned-date-time instant "Europe/Berlin")))
+    (jt/zoned-date-time instant timezone)))
 
 (defn retrieve-lake-temperatures
   "calls the /temperature endpoint for all given lakes, returns the results as a list"
@@ -137,20 +137,23 @@
   (if is-high-tide "HW" "NW"))
 
 (defn format-tide-extrema
-  [tide-information]
+  [tide-information timezone]
+  (println timezone)
   (format "  %s %s (%sm)"
           (format-time
             (parse-time
-              (get-in tide-information [:time])))
+              (get-in tide-information [:time])
+              timezone))
           (format-high-low-tide
             (get-in tide-information [:isHighTide]))
           (get-in tide-information [:height])))
 
 (defn format-tides
   [lake-map]
-  (let [tides (get-in lake-map [:tides])]
+  (let [tides (get-in lake-map [:tides])
+        timezone (get-in (get-in lake-map [:lake]) [:timeZoneId])]
     (str/join "\n" (for [tide tides]
-                     (format-tide-extrema tide)))))
+                     (format-tide-extrema tide timezone)))))
 
 (defn retrieve-tides
   [lakes]
