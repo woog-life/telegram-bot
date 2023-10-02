@@ -17,7 +17,7 @@ deployment:
   updateStrategy: Recreate
 
 cronjob:
-  name: telegram-updater
+  name: telegram-updater-v2
   image: ghcr.io/woog-life/telegram-bot:__TAG__
   imagePullPolicy: Always
   schedule: "0 7 * * *"
