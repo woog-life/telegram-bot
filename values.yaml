@@ -22,7 +22,11 @@ cronjob:
   imagePullPolicy: Always
   schedule: "0 7 * * *"
   timeZone: "Europe/Berlin"
-  arg: "update"
+  command: "java"
+  args:
+  - "-jar"
+  - "main.jar"
+  - "update"
   backoffLimit: 0
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
