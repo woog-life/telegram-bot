@@ -1,67 +1,15 @@
 (ns wooglife-bot.core
-  (:require [telegrambot-lib.core :as tbot]
-            [clj-http.client :as client]
-            [clojure.string :as str]
-            [cheshire.core :as json]
-            [java-time.api :as jt])
-  (:gen-class))
+  (:require [clojure.string :as str]
+            [telegrambot-lib.core :as tbot]
+            [wooglife-bot.format :as f]
+            [wooglife-bot.helper :as h]
+            [wooglife-bot.api :as api])
+  (:gen-class)
+  (:import (wooglife_bot.models Lake)))
 
-(defonce api-url
-         (or (System/getenv "API_URL")
-             "https://api.woog.life"))
-
-(println (format "use `%s` as api url", api-url))
-
-(defn retrieve-lake-temperature
-  "calls the /temperature endpoint for the given lake and returns a map with :name and :temperature (this is the preciseTemperature key from the api)"
-  [lake]
-  (as->
-    (format "%s/lake/%s/temperature?precision=2&formatRegion=DE" api-url (get-in lake [:id])) $
-    (client/get $ (:as :reader))
-    (get-in $ [:body])
-    (json/parse-string $ true)
-    (get-in $ [:preciseTemperature])))
-
-(defn parse-time
-  [time timezone]
-  (let [instant (jt/instant time)]
-    (jt/zoned-date-time instant timezone)))
-
-(defn retrieve-lake-temperatures
-  "calls the /temperature endpoint for all given lakes, returns the results as a list"
-  [lakes]
-  (for [lake lakes]
-    (let [temperature (retrieve-lake-temperature lake)]
-      {:temperature temperature,
-       :name        (get-in lake [:name])})))
-
-(defn retrieve-lake-tides
-  [lake]
-  (as->
-    (format "%s/lake/%s/tides" api-url (get-in lake [:id])) $
-    (client/get $ (:as :reader))
-    (get-in $ [:body])
-    (json/parse-string $ true)
-    (get-in $ [:extrema])))
-
-(defn is-temperature-command
-  "simply checks whether the message text starts with `/temperature`"
-  [msg]
-  (as-> (get-in msg [:text]) $
-        #_{:clj-kondo/ignore [:missing-else-branch]}
-        (if-not (nil? $)
-          (str/starts-with? $ "/temperature"))))
-
-(defn is-tides-command
-  "simply checks whether the message text starts with `/tides"
-  [msg]
-  (as-> (get-in msg [:text]) $
-        #_{:clj-kondo/ignore [:missing-else-branch]}
-        (if-not (nil? $)
-          (str/starts-with? $ "/tides"))))
 
 (def config
-  {:sleep 3000})                                            ;thread/sleep is in milliseconds
+  {:sleep 3000})
 
 (defonce update-id (atom nil))
 
@@ -82,168 +30,77 @@
        (println "tbot/get-updates error:" (:error resp))
        resp))))
 
-(defn lake-name-matches-filter
-  [lake-name args]
-  (->> (map str/lower-case args)
-       (clojure.core/filter (fn
-                              [arg]
-                              (str/includes? lake-name arg)))))
+(defonce bot-token (System/getenv "TOKEN"))
+;(if (or (nil? bot-token) (empty? bot-token))
+;  ((println "`TOKEN` env variable is required")
+;   (System/exit 1)))
+(defonce bot (tbot/create bot-token))
 
+(defonce notifier-ids (clojure.string/split (System/getenv "NOTIFIER_IDS") #","))
 
-(defn filter-lake
-  [lake args]
-  (as-> (get-in lake [:name]) $
-        (str/lower-case $)
-        (lake-name-matches-filter $ args)
-        (not (empty? $))))
+(defn assemble-lake-features
+  ([lake] (assemble-lake-features lake true true))
+  ([lake assemble-temperature assemble-tides]
+   (let [featured-lake (Lake. (:id lake)
+                              (:name lake)
+                              (:features lake)
+                              (:timeZoneId lake))]
+     (as->
+       (if (and (h/lake-supports-temperature lake) assemble-temperature)
+         (assoc featured-lake :temperatureData (api/get-lake-temperature (:id lake)))
+         featured-lake) $
+       (if (and (h/lake-supports-tides lake) assemble-tides)
+         (assoc $ :tides (api/get-lake-tides (:id lake)))
+         $)))))
 
-(defn filter-lakes
-  [lakes args]
-  (->> lakes
-       (clojure.core/filter (fn
-                              [lake]
-                              (filter-lake lake args)))))
-
-(defn get-lakes
-  [args]
-  (let [url (format "%s/lake" api-url)
-        response (client/get url {:as :reader})]
-    (with-open [reader (:body response)]
-      (let [response (json/parse-stream reader true)
-            lakes (get-in response [:lakes])]
-        (if (empty? args)
-          lakes
-          (doall (filter-lakes lakes args)))))))
-
-(defn format-lake
-  "{name}: {temperature}"
-  [lake]
-  (format "%s: %s°C" (get-in lake [:name]) (get-in lake [:temperature])))
-
-(defn generate-temperature-message
-  [args]
-  (let [lakes (get-lakes args)
-        temperatures (retrieve-lake-temperatures lakes)]
-    (str "Aktuelle Wassertemperaturen:\n\n"
-         (str/join "\n" (for [lake temperatures]
-                          (format-lake lake))))))
-
-(defn format-time
-  [time]
-  (jt/format "HH:mm dd.MM" time))
-
-(defn format-high-low-tide
-  [is-high-tide]
-  (if is-high-tide "HW" "NW"))
-
-(defn format-tide-extrema
-  [tide-information timezone]
-  (println timezone)
-  (format "  %s %s (%sm)"
-          (format-time
-            (parse-time
-              (get-in tide-information [:time])
-              timezone))
-          (format-high-low-tide
-            (get-in tide-information [:isHighTide]))
-          (get-in tide-information [:height])))
-
-(defn format-tides
-  [lake-map]
-  (let [tides (get-in lake-map [:tides])
-        timezone (get-in (get-in lake-map [:lake]) [:timeZoneId])]
-    (str/join "\n" (for [tide tides]
-                     (format-tide-extrema tide timezone)))))
-
-(defn retrieve-tides
+(defn assemble-full-featured-lakes
   [lakes]
-  (for [lake lakes]
-    {:lake  lake
-     :tides (retrieve-lake-tides lake)}))
+  (map assemble-lake-features lakes))
 
-(defn lake-has-feature
-  [lake feature]
-  (contains? (set (get-in lake [:features])) feature))
+(defn assemble-temperature-lakes
+  [lakes]
+  (let [lakes (filter h/lake-supports-temperature lakes)]
+  (map #(assemble-lake-features % true false) lakes)))
 
-(defn filter-by-supported-feature
-  [lakes feature]
-  (filter (fn [lake]
-            (lake-has-feature lake feature))
-            lakes))
+(defn assemble-tide-lakes
+  [lakes]
+  (let [lakes (filter h/lake-supports-tides lakes)]
+  (map #(assemble-lake-features % false true) lakes)))
 
-(defn generate-tides-message
-  [args]
-  (let [lakes (get-lakes args)
-        tides (retrieve-tides (filter-by-supported-feature lakes "tides"))]
-    (str "Aktuelle Tiden-Informationen:\n\n"
-         (str/join "\n\n" (for [tide tides]
-                            (str/join
-                              "\n"
-                              [(get-in (get-in tide [:lake]) [:name])
-                               (format-tides tide)]))))))
-
-(defn get-all-lake-info
-  [lake]
-  {
-   :tides       (if (lake-has-feature lake "tides")
-                  [(retrieve-lake-tides lake)]
-                  nil)
-   :temperature (retrieve-lake-temperature lake)})
-
-(defn generate-update-lake-item
-  [lake]
-  (let [lake-info (get-all-lake-info lake)]
-    (str/join "\n"
-              [(format-lake {:name        (get-in lake [:name])
-                             :temperature (get-in lake-info [:temperature])})
-               (if (nil? (get-in lake-info [:tides]))
-                 nil
-                 (str
-                   (str/join "\n" (for [tide (retrieve-tides [lake])]
-                                    (format-tides tide)))
-                   "\n"))])))
-
-(defn generate-updates-message
-  []
-  (let [lakes (get-lakes [])]
-    (str/join "" (for [lake lakes]
-                     (generate-update-lake-item lake)))))
+(defn generate-update-message
+  ([] (generate-update-message (api/get-lakes)))
+  ([lakes]
+   (f/format-lakes
+     (assemble-full-featured-lakes lakes))))
 
 (defn send-message
-  [bot chat-id message]
+  [chat-id message]
   (println "send to telegram-chat" chat-id)
   (tbot/send-message bot {:chat_id chat-id
                           :text    message}))
 
-(defn parse-command-args
-  [message]
-  (as-> (get-in message [:text]) $
-        (rest (str/split $ #" "))))
+(defn handle-feature-command
+  [message assemble-fn]
+  (let [args (rest (str/split (:text message) #" "))
+        lakeNameFilter (h/join " " args)
+        lakes (api/get-lakes)
+        lakes (h/filter-lakes-by-name lakes lakeNameFilter)]
+    (send-message
+      (:id (:chat message))
+      (f/format-lakes
+        (assemble-fn lakes)))))
 
 (defn handle-temperature-command
-  [bot message]
-  (println "handle temperature command")
-  (let
-    [chat-id (get-in (get-in message [:chat]) [:id])
-     args (parse-command-args message)
-     msg (generate-temperature-message args)]
-    (if (= msg "Aktuelle Wassertemperaturen:\n\n")
-      (println "don't send temperature due to no content" msg)
-      (println (send-message bot chat-id msg)))))
+  [message]
+  (handle-feature-command message assemble-temperature-lakes))
 
 (defn handle-tides-command
-  [bot message]
-  (let
-    [chat-id (get-in (get-in message [:chat]) [:id])
-     args (parse-command-args message)
-     msg (generate-tides-message args)]
-    (if (= msg "Aktuelle Tiden-Informationen:\n\n")
-      (println "don't send tides due to no content" msg)
-      (println (send-message bot chat-id msg)))))
+  [message]
+  (handle-feature-command message assemble-tide-lakes))
 
 (defn app
   "Retrieve and process chat messages."
-  [bot]
+  []
   (println "bot service started.")
 
   (loop []
@@ -252,11 +109,11 @@
 
       (doseq [msg messages]
         (let [message (get-in msg [:message])]
-          #_{:clj-kondo/ignore [:missing-else-branch]}
-          (if (is-temperature-command message)
-            (handle-temperature-command bot message)
-            (if (is-tides-command message)
-              (handle-tides-command bot message))))
+          (if (h/is-temperature-command message)
+            (handle-temperature-command message)
+            #_{:clj-kondo/ignore [:missing-else-branch]}
+            (if (h/is-tides-command message)
+              (handle-tides-command message))))
 
         ;; Increment the next update-id to process.
         (-> msg
@@ -267,16 +124,13 @@
       (Thread/sleep (:sleep config)))
     (recur)))
 
-(defn generate-update
-  [bot]
-  (send-message bot (System/getenv "NOTIFIER_IDS") (generate-updates-message)))
+(defn send-update-message
+  [chat-ids]
+  (let [message (generate-update-message)]
+    (doall (map #(send-message % message) chat-ids))))
 
 (defn -main
   [& args]
-  (let [token (System/getenv "TOKEN")]
-    (if (= token nil)
-      [(println "no token defined in environment")
-       (System/exit 1)]
-      [(if (empty? args)
-         [(app (tbot/create token))]
-         [(generate-update (tbot/create token))])])))
+    (if (empty? args)
+       [(app)]
+       [(send-update-message notifier-ids)]))
