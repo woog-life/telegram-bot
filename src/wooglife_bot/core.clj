@@ -31,12 +31,15 @@
        resp))))
 
 (defonce bot-token (System/getenv "TOKEN"))
-;(if (or (nil? bot-token) (empty? bot-token))
-;  ((println "`TOKEN` env variable is required")
-;   (System/exit 1)))
+#_{:clj-kondo/ignore [:missing-else-branch]}
+(if (or (nil? bot-token) (empty? bot-token))
+  ((println "`TOKEN` env variable is required")
+   (System/exit 1)))
+
 (defonce bot (tbot/create bot-token))
 
-(defonce notifier-ids (clojure.string/split (System/getenv "NOTIFIER_IDS") #","))
+; (defonce notifier-ids (clojure.string/split (System/getenv "NOTIFIER_IDS") #","))
+(defonce notifier-ids (System/getenv "NOTIFIER_IDS"))
 
 (defn assemble-lake-features
   ([lake] (assemble-lake-features lake true true))
