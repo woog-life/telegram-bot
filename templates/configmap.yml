@@ -7,3 +7,4 @@ data:
   API_URL: "{{ .Values.configmap.woog.apiUrl}}"
   NOTIFIER_IDS: "{{ .Values.configmap.notifierIds }}"
   ALERT_IDS: "{{ .Values.configmap.alertIds }}"
+  IGNORE_IDS_IN_UPDATE: "{{- join "," .Values.configmap.ignoreIdsInUpdate }}"

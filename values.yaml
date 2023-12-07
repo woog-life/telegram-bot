@@ -50,3 +50,8 @@ configmap:
     apiUrl: http://backend
   notifierIds: "-1001397708243"
   alertIds: "139656428"
+  ignoreIdsInUpdate:
+    - "a2595d6a-a6fc-4ee3-86b4-871f32f28b4c" # santander
+    - "bedbdac7-7d61-48d5-b1bd-0de5be25e953" # potsdam
+    - "359e0773-e7ee-4ee0-8c11-a9eb5082d899" # heraklion
+    - "4ddb043b-d0d2-44a5-b321-6efbaacf98a0" # sorrento
