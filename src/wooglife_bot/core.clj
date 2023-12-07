@@ -30,16 +30,22 @@
        (println "tbot/get-updates error:" (:error resp))
        resp))))
 
-(defonce bot-token (System/getenv "TOKEN"))
-#_{:clj-kondo/ignore [:missing-else-branch]}
-(if (or (nil? bot-token) (empty? bot-token))
-  ((println "`TOKEN` env variable is required")
-   (System/exit 1)))
+(defn token
+  []
+  (let [bot-token (System/getenv "TOKEN")]
+    #_{:clj-kondo/ignore [:missing-else-branch]}
+    (if (or (nil? bot-token) (empty? bot-token))
+      ((println "`TOKEN` env variable is required")
+       (System/exit 1))
+      bot-token)))
 
-(defonce bot (tbot/create bot-token))
+(defn bot
+  []
+  (tbot/create (token)))
 
-; (defonce notifier-ids (clojure.string/split (System/getenv "NOTIFIER_IDS") #","))
-(defonce notifier-ids (System/getenv "NOTIFIER_IDS"))
+(defn notifier-ids
+  []
+  (clojure.string/split (System/getenv "NOTIFIER_IDS") #","))
 
 (defn assemble-lake-features
   ([lake] (assemble-lake-features lake true true))
@@ -63,12 +69,12 @@
 (defn assemble-temperature-lakes
   [lakes]
   (let [lakes (filter h/lake-supports-temperature lakes)]
-  (map #(assemble-lake-features % true false) lakes)))
+    (map #(assemble-lake-features % true false) lakes)))
 
 (defn assemble-tide-lakes
   [lakes]
   (let [lakes (filter h/lake-supports-tides lakes)]
-  (map #(assemble-lake-features % false true) lakes)))
+    (map #(assemble-lake-features % false true) lakes)))
 
 (defn generate-update-message
   ([] (generate-update-message (api/get-lakes)))
@@ -79,8 +85,8 @@
 (defn send-message
   [chat-id message]
   (println "send to telegram-chat" chat-id)
-  (tbot/send-message bot {:chat_id chat-id
-                          :text    message}))
+  (tbot/send-message (bot) {:chat_id chat-id
+                            :text    message}))
 
 (defn handle-feature-command
   [message assemble-fn]
@@ -107,7 +113,7 @@
   (println "bot service started.")
 
   (loop []
-    (let [updates (poll-updates bot @update-id)
+    (let [updates (poll-updates (bot) @update-id)
           messages (:result updates)]
 
       (doseq [msg messages]
@@ -134,6 +140,6 @@
 
 (defn -main
   [& args]
-    (if (empty? args)
-       [(app)]
-       [(send-update-message notifier-ids)]))
+  (if (empty? args)
+    [(app)]
+    [(send-update-message (notifier-ids))]))
