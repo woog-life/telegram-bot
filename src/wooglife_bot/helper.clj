@@ -20,6 +20,24 @@
   [lakes subs]
   (filter #(lake-name-includes % subs) lakes))
 
+(defn lake-has-id
+  [lake id]
+  (= id (:id lake)))
+
+(defn lake-has-ids-not
+  [lake ids]
+  (let [fids (filter
+                (fn [id] (lake-has-id lake id))
+                ids)]
+    (empty? fids)))
+
+(defn filter-lakes-by-ids-not
+  [lakes ids]
+  (filter
+    (fn [lake]
+      (lake-has-ids-not lake ids))
+    lakes))
+
 (defn lake-supports-feature
   [lake feature]
   (contains? (set (:features lake)) feature))

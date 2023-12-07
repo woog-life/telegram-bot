@@ -76,11 +76,18 @@
   (let [lakes (filter h/lake-supports-tides lakes)]
     (map #(assemble-lake-features % false true) lakes)))
 
+(defn ignore-ids-in-update
+  []
+  (clojure.string/split (System/getenv "IGNORE_IDS_IN_UPDATE") #","))
+
 (defn generate-update-message
   ([] (generate-update-message (api/get-lakes)))
   ([lakes]
-   (f/format-lakes
-     (assemble-full-featured-lakes lakes))))
+   (let [
+         filtered-lakes (h/filter-lakes-by-ids-not lakes (ignore-ids-in-update))
+         full-lakes (assemble-full-featured-lakes filtered-lakes)]
+     (println filtered-lakes)
+     (f/format-lakes full-lakes))))
 
 (defn send-message
   [chat-id message]
