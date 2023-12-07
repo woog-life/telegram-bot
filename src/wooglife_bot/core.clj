@@ -83,11 +83,10 @@
 (defn generate-update-message
   ([] (generate-update-message (api/get-lakes)))
   ([lakes]
-   (let [
-         filtered-lakes (h/filter-lakes-by-ids-not lakes (ignore-ids-in-update))
-         full-lakes (assemble-full-featured-lakes filtered-lakes)]
-     (println filtered-lakes)
-     (f/format-lakes full-lakes))))
+   (let [filtered-lakes (h/filter-lakes-by-ids-not lakes (ignore-ids-in-update))
+         full-lakes (assemble-full-featured-lakes filtered-lakes)
+         new-lake-data (h/filter-old-lake-data full-lakes)]
+     (f/format-lakes new-lake-data))))
 
 (defn send-message
   [chat-id message]

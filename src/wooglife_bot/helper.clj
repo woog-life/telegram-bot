@@ -27,8 +27,8 @@
 (defn lake-has-ids-not
   [lake ids]
   (let [fids (filter
-                (fn [id] (lake-has-id lake id))
-                ids)]
+               (fn [id] (lake-has-id lake id))
+               ids)]
     (empty? fids)))
 
 (defn filter-lakes-by-ids-not
@@ -66,3 +66,16 @@
   "simply checks whether the message text starts with `/tides"
   [msg]
   (is-named-command msg "/tides"))
+
+(defn is-old
+  [lake]
+  (println lake)
+  (let [temperatureData (:temperatureData lake)
+        lastUpdateTime (parse-time (:time temperatureData) (:timeZoneId lake))
+        now (jt/zoned-date-time)
+        cutoff (jt/minus now (jt/minutes 1439))]            ; 23h59m
+    (jt/before? lastUpdateTime cutoff)))
+
+(defn filter-old-lake-data
+  [lakes]
+  (filter #(not (is-old %)) lakes))
