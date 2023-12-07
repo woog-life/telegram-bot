@@ -69,7 +69,9 @@
 (defn assemble-temperature-lakes
   [lakes]
   (let [lakes (filter h/lake-supports-temperature lakes)]
-    (map #(assemble-lake-features % true false) lakes)))
+    (h/filter-old-lake-data
+      (map #(assemble-lake-features % true false) lakes)
+      1439)))
 
 (defn assemble-tide-lakes
   [lakes]
@@ -85,7 +87,7 @@
   ([lakes]
    (let [filtered-lakes (h/filter-lakes-by-ids-not lakes (ignore-ids-in-update))
          full-lakes (assemble-full-featured-lakes filtered-lakes)
-         new-lake-data (h/filter-old-lake-data full-lakes)]
+         new-lake-data (h/filter-old-lake-data full-lakes 1439)]
      (f/format-lakes new-lake-data))))
 
 (defn send-message

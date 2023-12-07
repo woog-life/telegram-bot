@@ -68,14 +68,13 @@
   (is-named-command msg "/tides"))
 
 (defn is-old
-  [lake]
-  (println lake)
+  [lake time-in-minutes]
   (let [temperatureData (:temperatureData lake)
         lastUpdateTime (parse-time (:time temperatureData) (:timeZoneId lake))
         now (jt/zoned-date-time)
-        cutoff (jt/minus now (jt/minutes 1439))]            ; 23h59m
+        cutoff (jt/minus now (jt/minutes time-in-minutes))] ; 23h59m
     (jt/before? lastUpdateTime cutoff)))
 
 (defn filter-old-lake-data
-  [lakes]
-  (filter #(not (is-old %)) lakes))
+  [lakes time-in-minutes]
+  (filter #(not (is-old % time-in-minutes)) lakes))
