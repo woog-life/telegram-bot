@@ -23,7 +23,7 @@
   [lake]
   (LakeOutput. (:id lake)
                (:name lake)
-               (:features lake)
+               (:supportedFeatures lake)
                (:timeZoneId lake)))
 
 (defn api-temperature-to-record
