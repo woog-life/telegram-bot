@@ -7,7 +7,7 @@
                  [telegrambot-lib "2.7.0"]
                  [cheshire "5.12.0"]
                  [clj-http "3.12.3"]
-                 [clojure.java-time "1.3.0"]]
+                 [clojure.java-time "1.4.2"]]
   :main ^:skip-aot wooglife-bot.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
